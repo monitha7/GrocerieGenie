@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - GroceryGenie{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>GroceryGenie</h1>
+    <div class="upload-container">
+        <div class="file-input">
+            <label for="fileInput">Choose Image</label>
+            <input id="fileInput" type="file" name="file" accept="image/*">
+        </div>
+        <button id="uploadGrocery" type="button">Upload Your Grocery items to Store</button>
+        <button id="uploadFridge" type="button">Generate Recipes</button>
+    </div>
+    <div class="inventory-container">
+        <h2>What's in Your Fridge</h2>
+        <table id="inventoryTable">
+            <thead>
+                <tr>
+                    <th>Items</th>
+                    <th>Quantity</th>
+                    <th>Exp. Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Inventory items will be dynamically added here -->
+            </tbody>
+        </table>
+        <button id="addItem">Add Item</button>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+  $(document).ready(function () {
+    console.log("📦 GroceryGenie dashboard script loaded!");
+
+    function loadInventory() {
+      $.ajax({
+        url: "/inventory",
+        type: "GET",
+        success: function (data) {
+          $("#inventoryTable tbody").empty();
+          if (Array.isArray(data)) {
+            data.forEach(function (item, index) {
+              addItemToTable(item.name, item.quantity, "", index);
+            });
+          }
+        },
+        error: function (err) {
+          console.error("Error loading inventory:", err);
+        },
+      });
+    }
+
+    function addItemToTable(name = "", quantity = "1", expDate = "", index = null) {
+      const itemIndex = index !== null ? `data-index="${index}"` : "";
+      const quantityOptions = Array.from(
+        { length: 100 },
+        (_, i) => `<option value="${i + 1}" ${i + 1 == quantity ? "selected" : ""}>${i + 1}</option>`
+      ).join("");
+
+      $("#inventoryTable tbody").append(`
+        <tr ${itemIndex}>
+            <td contenteditable="true">${name}</td>
+            <td><select class="quantity">${quantityOptions}</select></td>
+            <td><input type="date" class="expDate" value="${expDate}"></td>
+            <td><button class="deleteItem">Delete</button></td>
+        </tr>
+      `);
+    }
+
+    function addItemToServer(name, quantity, expDate) {
+      $.ajax({
+        url: "/inventory",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ name, quantity, expiration_date: expDate }),
+        success: function () {
+          loadInventory();
+        },
+        error: function (err) {
+          console.error("Error adding item:", err);
+        },
+      });
+    }
+
+    $("#uploadGrocery").on("click", function (event) {
+      event.preventDefault();
+      $.ajax({
+        url: "/grocery_analyze",
+        type: "POST",
+        success: function (data) {
+          console.log("✅ Grocery items received:", data);
+          if (Array.isArray(data)) {
+            data.forEach(function (item) {
+              addItemToTable(item.name, item.quantity);
+            });
+          } else {
+            console.error("❌ Unexpected response:", data);
+          }
+        },
+        error: function (err) {
+          console.error("Error analyzing grocery receipt:", err);
+        },
+      });
+    });
+
+    // ✅ Add this handler for the "Generate Recipes" button
+    $("#uploadFridge").on("click", function (event) {
+      event.preventDefault();
+      $.ajax({
+        url: "/analyze",
+        type: "POST",
+        success: function (response) {
+          if (response.redirect) {
+            window.location.href = response.redirect;
+          } else {
+            console.log("🍽️ Recipe generation complete");
+          }
+        },
+        error: function (err) {
+          console.error("❌ Error analyzing inventory:", err);
+        },
+      });
+    });
+
+    loadInventory();
+  });
+</script>
+
+{% endblock %}
